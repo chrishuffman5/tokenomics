@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tokenomics — Understanding LLM API Pricing</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --bg-2: #111a2e;
+    --fg: #e8edf7;
+    --muted: #9aa6bf;
+    --accent: #4cc9f0;
+    --accent-2: #f7b801;
+    --good: #4ade80;
+    --bad: #f87171;
+    --border: #233055;
+    --code-bg: #0a1530;
+    --table-row: #13203a;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f8fc;
+      --bg-2: #ffffff;
+      --fg: #14213d;
+      --muted: #5a6a85;
+      --accent: #0077b6;
+      --accent-2: #b5651d;
+      --good: #16a34a;
+      --bad: #b91c1c;
+      --border: #d8deec;
+      --code-bg: #eef2fb;
+      --table-row: #eef2fb;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    overflow: hidden;
+  }
+
+  .deck {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6vh 8vw;
+    overflow: auto;
+  }
+  .slide.active { display: flex; }
+
+  h1 { font-size: clamp(2.2rem, 5vw, 4rem); margin: 0 0 1rem; line-height: 1.1; }
+  h2 { font-size: clamp(1.6rem, 3.4vw, 2.5rem); margin: 0 0 1.5rem; line-height: 1.15; color: var(--accent); }
+  h3 { font-size: clamp(1.1rem, 1.8vw, 1.4rem); margin: 1rem 0 0.4rem; color: var(--accent-2); }
+  p, li { font-size: clamp(1rem, 1.6vw, 1.35rem); line-height: 1.5; color: var(--fg); }
+  ul { padding-left: 1.4rem; }
+  li { margin-bottom: 0.45rem; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.9rem; }
+  .center { text-align: center; }
+
+  .title-slide {
+    align-items: center;
+    text-align: center;
+  }
+  .title-slide h1 {
+    font-size: clamp(2.5rem, 7vw, 5.5rem);
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .title-slide .sub {
+    font-size: clamp(1.1rem, 2vw, 1.6rem);
+    color: var(--muted);
+    margin-top: 0.5rem;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+
+  .card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.4rem;
+  }
+  .card.accent { border-color: var(--accent); }
+  .card.warn { border-color: var(--accent-2); }
+  .card.good { border-color: var(--good); }
+  .card.bad { border-color: var(--bad); }
+
+  code, pre, .mono {
+    font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  code { background: var(--code-bg); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.92em; }
+  pre {
+    background: var(--code-bg);
+    padding: 1rem 1.2rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: clamp(0.9rem, 1.3vw, 1.1rem);
+    margin-top: 0.5rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--accent); font-weight: 600; }
+  tbody tr:nth-child(odd) td { background: var(--table-row); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .token-demo span {
+    display: inline-block;
+    margin: 0.15rem 0.18rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 5px;
+    font-family: ui-monospace, monospace;
+    font-size: 1.15rem;
+  }
+  .t1 { background: rgba(76, 201, 240, 0.22); color: var(--accent); }
+  .t2 { background: rgba(247, 184, 1, 0.22); color: var(--accent-2); }
+  .t3 { background: rgba(74, 222, 128, 0.22); color: var(--good); }
+  .t4 { background: rgba(248, 113, 113, 0.22); color: var(--bad); }
+
+  .progress {
+    position: fixed;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    transition: width 0.25s ease;
+    z-index: 10;
+  }
+  .footer {
+    position: fixed;
+    bottom: 10px;
+    right: 14px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    z-index: 10;
+    user-select: none;
+  }
+  .nav-hint {
+    position: fixed;
+    bottom: 10px;
+    left: 14px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    z-index: 10;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    background: var(--code-bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    margin-left: 0.4rem;
+    vertical-align: middle;
+  }
+
+  .formula {
+    font-size: 1.15rem;
+    background: var(--code-bg);
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    border-left: 3px solid var(--accent);
+    margin: 0.8rem 0;
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  .compare .card { display: flex; flex-direction: column; }
+  .compare .total { margin-top: auto; font-size: 1.5rem; font-weight: 700; padding-top: 0.6rem; }
+
+  .pill { display:inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.85rem; }
+  .pill.in { background: rgba(76, 201, 240, 0.18); color: var(--accent); }
+  .pill.out { background: rgba(247, 184, 1, 0.2); color: var(--accent-2); }
+  .pill.cw { background: rgba(248, 113, 113, 0.18); color: var(--bad); }
+  .pill.cr { background: rgba(74, 222, 128, 0.18); color: var(--good); }
+
+  .stack-bars {
+    display: grid;
+    gap: 6px;
+    margin-top: 0.8rem;
+  }
+  .bar {
+    display: grid;
+    grid-template-columns: 90px 1fr 110px;
+    align-items: center;
+    gap: 10px;
+  }
+  .bar .label { color: var(--muted); font-size: 0.95rem; }
+  .bar .track { height: 22px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .bar .fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  .bar .val { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.95rem; }
+
+  @media print {
+    body { overflow: visible; background: white; color: black; }
+    .deck { height: auto; }
+    .slide { display: flex !important; position: relative; height: 100vh; page-break-after: always; }
+    .footer, .nav-hint, .progress { display: none; }
+  }
+
+  /* Mobile fallback */
+  @media (max-width: 700px) {
+    .grid-2, .grid-3, .compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- 1. Title -->
+  <section class="slide title-slide active">
+    <h1>Tokenomics</h1>
+    <div class="sub">Understanding LLM API Pricing — input, output, caching, and context bloat</div>
+    <p class="muted small" style="margin-top:3rem;">A 15-minute primer using Amazon Bedrock as the worked example.</p>
+  </section>
+
+  <!-- 2. What is a token -->
+  <section class="slide">
+    <h2>What is a token?</h2>
+    <div class="grid-2">
+      <div>
+        <p>A <strong>token</strong> is the atomic unit a language model reads and writes. It is <em>not</em> a word and it is <em>not</em> a character.</p>
+        <p>Tokenizers split text into sub-word pieces using algorithms like Byte-Pair Encoding (BPE) or SentencePiece. Common words become a single token; rare words and punctuation get split.</p>
+        <h3>Rules of thumb (English)</h3>
+        <ul>
+          <li>~4 characters per token</li>
+          <li>~0.75 words per token</li>
+          <li>1,000 tokens ≈ 750 words ≈ 1.5 pages</li>
+          <li>Code, JSON, and non-English text use <em>more</em> tokens per character</li>
+        </ul>
+      </div>
+      <div class="card accent">
+        <h3 style="margin-top:0;">Why it matters</h3>
+        <p>Every API charge is measured in tokens. Every context-window limit is measured in tokens. If you can&rsquo;t estimate tokens, you can&rsquo;t estimate cost or capacity.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Tokenization in action -->
+  <section class="slide">
+    <h2>Tokenization in action</h2>
+    <p class="muted">The same sentence, broken into the tokens the model actually sees:</p>
+    <div class="card token-demo" style="margin-top:1rem;">
+      <p style="font-size:1.4rem; margin: 0.5rem 0 0.3rem;">"The quick brown fox jumps over the lazy dog."</p>
+      <div style="margin-top:0.5rem;">
+        <span class="t1">The</span><span class="t2"> quick</span><span class="t3"> brown</span><span class="t4"> fox</span><span class="t1"> jumps</span><span class="t2"> over</span><span class="t3"> the</span><span class="t4"> lazy</span><span class="t1"> dog</span><span class="t2">.</span>
+      </div>
+      <p class="muted small" style="margin-top:0.7rem;">10 tokens, 44 characters → ~4.4 chars/token. Leading spaces are part of the token.</p>
+    </div>
+    <div class="grid-2" style="margin-top:1.5rem;">
+      <div class="card warn">
+        <h3 style="margin-top:0;">Inflators</h3>
+        <ul>
+          <li>Code: <code>useState</code> → 2-3 tokens</li>
+          <li>JSON keys, brackets, quotes</li>
+          <li>Emoji and CJK characters</li>
+          <li>Long URLs and base64 blobs</li>
+        </ul>
+      </div>
+      <div class="card good">
+        <h3 style="margin-top:0;">Compactors</h3>
+        <ul>
+          <li>Common English words (1 token each)</li>
+          <li>Plain prose, simple punctuation</li>
+          <li>Numbers in small ranges</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Input vs Output -->
+  <section class="slide">
+    <h2>The billing model: input vs output</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;"><span class="pill in">INPUT</span> tokens</h3>
+        <p>Everything you <em>send</em> to the model:</p>
+        <ul>
+          <li>System prompt</li>
+          <li>User message</li>
+          <li>Conversation history</li>
+          <li>Tool/function definitions</li>
+          <li>Retrieved documents (RAG)</li>
+          <li>Attachments converted to text</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;"><span class="pill out">OUTPUT</span> tokens</h3>
+        <p>Everything the model <em>generates</em>:</p>
+        <ul>
+          <li>The assistant&rsquo;s reply text</li>
+          <li>Tool call arguments</li>
+          <li>Streaming chunks (counted once)</li>
+          <li>Reasoning / thinking tokens (where billed)</li>
+        </ul>
+      </div>
+    </div>
+    <p class="formula" style="margin-top:1.5rem;">
+      <strong>Cost</strong> = (input_tokens / 1M) × input_rate + (output_tokens / 1M) × output_rate
+    </p>
+  </section>
+
+  <!-- 5. Why output costs more -->
+  <section class="slide">
+    <h2>Why output tokens cost ~5× more</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Input is processed in parallel</h3>
+        <p>The whole prompt is fed through the network in one big batched forward pass — the &ldquo;prefill&rdquo; phase. GPUs love this; it&rsquo;s memory-bandwidth bound but highly parallel.</p>
+        <h3>Output is generated one token at a time</h3>
+        <p>Each output token is an autoregressive step: a full forward pass through the model just to produce the next token. The KV-cache helps, but you still pay per step.</p>
+      </div>
+      <div class="card accent">
+        <h3 style="margin-top:0;">Typical ratio</h3>
+        <p>On most providers, output is priced <strong>3×–5× higher</strong> than input.</p>
+        <p>Claude Sonnet 4.6 on Bedrock: <code>$3</code> input / <code>$15</code> output per 1M → <strong>5×</strong>.</p>
+        <p class="small muted">This is why summarization and translation can be cheap — and why a verbose model writing essays gets expensive fast.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Bedrock pricing landscape -->
+  <section class="slide">
+    <h2>Amazon Bedrock pricing landscape</h2>
+    <p>Bedrock hosts foundation models from multiple providers — Anthropic, Amazon Nova, Meta, Mistral, Cohere, AI21, Stability — each with its own per-token rate. <span class="muted">Source:</span> <code>aws.amazon.com/bedrock/pricing</code></p>
+    <div class="grid-3" style="margin-top:1rem;">
+      <div class="card">
+        <h3 style="margin-top:0;">On-Demand</h3>
+        <p>Pay per token. No commitment. Best for variable or unknown workloads.</p>
+      </div>
+      <div class="card warn">
+        <h3 style="margin-top:0;">Batch</h3>
+        <p><strong>50% discount</strong> on input + output. Async, returns within 24h. Great for backfills and offline jobs.</p>
+      </div>
+      <div class="card accent">
+        <h3 style="margin-top:0;">Provisioned Throughput</h3>
+        <p>Reserve dedicated model units by the hour. Predictable latency for steady high-volume traffic.</p>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top:1.2rem;">Pricing also varies by AWS region. Cross-region inference profiles can change which rate applies.</p>
+  </section>
+
+  <!-- 7. Bedrock Claude pricing table -->
+  <section class="slide">
+    <h2>Bedrock — Claude on-demand rates <span class="badge">per 1M tokens</span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th class="num"><span class="pill in">Input</span></th>
+          <th class="num"><span class="pill out">Output</span></th>
+          <th class="num"><span class="pill cw">Cache write</span></th>
+          <th class="num"><span class="pill cr">Cache read</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Claude Sonnet 4.6 <span class="muted small">(on-demand)</span></td>
+          <td class="num">$3.00</td>
+          <td class="num">$15.00</td>
+          <td class="num">$3.75</td>
+          <td class="num">$0.30</td>
+        </tr>
+        <tr>
+          <td>Claude Sonnet 4.6 <span class="muted small">— 1-hour cache TTL</span></td>
+          <td class="num">$3.00</td>
+          <td class="num">$15.00</td>
+          <td class="num">$6.00</td>
+          <td class="num">$0.30</td>
+        </tr>
+        <tr>
+          <td>Claude Sonnet 4.6 <span class="muted small">— Batch (50% off)</span></td>
+          <td class="num">$1.50</td>
+          <td class="num">$7.50</td>
+          <td class="num">—</td>
+          <td class="num">—</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="card warn" style="margin-top:1.5rem;">
+      <p style="margin:0;"><strong>⚠ Verify before quoting.</strong> Bedrock pricing changes — new models arrive, deprecated ones move to &ldquo;extended access&rdquo; with different rates. Always check the live pricing page for the model and region you actually use.</p>
+    </div>
+  </section>
+
+  <!-- 8. Prompt caching: the idea -->
+  <section class="slide">
+    <h2>Prompt caching: pay once, reuse cheap</h2>
+    <div class="grid-2">
+      <div>
+        <p>Most prompts re-send the <em>same prefix</em> over and over: system prompt, tool schemas, loaded documents, conversation history.</p>
+        <p>Prompt caching lets the provider store the model&rsquo;s internal state for that prefix and reuse it on the next request — skipping the prefill compute.</p>
+        <h3>Two new line items</h3>
+        <ul>
+          <li><span class="pill cw">Cache write</span> first time you mark a prefix — costs <strong>~1.25× input rate</strong></li>
+          <li><span class="pill cr">Cache read</span> every subsequent hit — costs <strong>~0.10× input rate</strong> (90% off)</li>
+        </ul>
+      </div>
+      <div class="card accent">
+        <h3 style="margin-top:0;">Mechanics</h3>
+        <ul>
+          <li>You mark <em>cache breakpoints</em> in the prompt</li>
+          <li>Match must be exact, prefix-aligned (any change before the breakpoint busts the cache)</li>
+          <li>Bedrock TTL: <strong>~5 minutes</strong> idle</li>
+          <li>Minimum ~1K tokens to be cacheable</li>
+        </ul>
+        <p class="muted small">Cache where the prompt is stable. Don&rsquo;t cache where it changes every turn.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Caching pricing visualised -->
+  <section class="slide">
+    <h2>The caching discount, visualised</h2>
+    <p class="muted">Claude Sonnet 4.6 on Bedrock — relative cost per 1M tokens (input price = 1.0×):</p>
+    <div class="stack-bars" style="margin-top:1.5rem;">
+      <div class="bar">
+        <div class="label"><span class="pill cr">Cache read</span></div>
+        <div class="track"><div class="fill" style="width:2%; background: var(--good);"></div></div>
+        <div class="val">$0.30 &nbsp;<span class="muted small">0.10×</span></div>
+      </div>
+      <div class="bar">
+        <div class="label"><span class="pill in">Input</span></div>
+        <div class="track"><div class="fill" style="width:20%;"></div></div>
+        <div class="val">$3.00 &nbsp;<span class="muted small">1.00×</span></div>
+      </div>
+      <div class="bar">
+        <div class="label"><span class="pill cw">Cache write</span></div>
+        <div class="track"><div class="fill" style="width:25%; background: var(--bad);"></div></div>
+        <div class="val">$3.75 &nbsp;<span class="muted small">1.25×</span></div>
+      </div>
+      <div class="bar">
+        <div class="label"><span class="pill out">Output</span></div>
+        <div class="track"><div class="fill" style="width:100%; background: linear-gradient(90deg, var(--accent-2), var(--bad));"></div></div>
+        <div class="val">$15.00 &nbsp;<span class="muted small">5.00×</span></div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:1.5rem;">Translation: a cached read is <strong>50× cheaper</strong> than the same tokens served as output. Caching changes the economics of long-context workloads.</p>
+  </section>
+
+  <!-- 10. Worked example #1 -->
+  <section class="slide">
+    <h2>Example 1 — A simple Q&A</h2>
+    <p class="muted">User asks one question, model answers. Claude Sonnet 4.6 on Bedrock.</p>
+    <div class="card" style="margin-top:0.5rem;">
+      <p><strong>Prompt:</strong> &ldquo;Explain what a Kubernetes pod is in one paragraph.&rdquo;</p>
+      <p><strong>Reply:</strong> ~150 words → ~200 output tokens. Prompt incl. system + question ≈ 80 input tokens.</p>
+    </div>
+    <pre>Input  :   80 tokens × $3  / 1,000,000 = $0.00024
+Output :  200 tokens × $15 / 1,000,000 = $0.00300
+                                    ────────────
+Total per call                       ≈ $0.0032  (a third of a cent)</pre>
+    <p class="muted">At this scale, you can run thousands of calls before pricing matters. The story changes when context gets large.</p>
+  </section>
+
+  <!-- 11. Worked example #2 -->
+  <section class="slide">
+    <h2>Example 2 — Long context, no cache</h2>
+    <p>Doc-Q&A bot: a 50K-token policy document loaded into the prompt. User asks 100 questions over a session.</p>
+    <pre>Per call:
+  Input  : 50,000 tokens × $3  / 1,000,000 = $0.1500
+  Output :    500 tokens × $15 / 1,000,000 = $0.0075
+                                            ────────
+                                            $0.1575
+
+100 calls × $0.1575                         = <strong>$15.75</strong></pre>
+    <p class="muted">Notice: the 50K-token document is re-sent — and re-billed — on every single turn. The output is trivial; the input is doing the damage.</p>
+  </section>
+
+  <!-- 12. Worked example #3 -->
+  <section class="slide">
+    <h2>Example 3 — Same workload, with caching</h2>
+    <p>Mark the 50K-token doc as cached. The first call writes the cache; the next 99 read from it.</p>
+    <pre>Call 1 (cache write):
+  50,000 × $3.75 / 1M = $0.1875
+     500 × $15   / 1M = $0.0075
+                       ───────
+                       $0.1950
+
+Calls 2–100 (cache read):
+  50,000 × $0.30 / 1M = $0.0150
+     500 × $15   / 1M = $0.0075
+                       ───────
+                       $0.0225 × 99 = $2.2275
+
+Session total                       = <strong>$2.42</strong></pre>
+    <div class="card good" style="margin-top:0.8rem;">
+      <p style="margin:0;"><strong>$15.75 → $2.42 = 85% savings</strong> — by changing one flag in the request, not the model or the prompt.</p>
+    </div>
+  </section>
+
+  <!-- 13. Context bloat -->
+  <section class="slide">
+    <h2>Where does context bloat come from?</h2>
+    <p>The model has no memory between requests. To act &ldquo;continuous,&rdquo; the client re-sends everything, every turn. That means every loaded artifact is paid for again and again.</p>
+    <div class="grid-3" style="margin-top:1rem;">
+      <div class="card">
+        <h3 style="margin-top:0;">Skills</h3>
+        <p>Each loaded skill injects instructions, examples, and metadata into the system prompt. Typical: <strong>200–2,000 tokens each</strong>. Load 10 skills → 5K–20K baseline.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">MCP servers</h3>
+        <p>Every tool the server exposes adds a JSON schema, description, and parameter docs. Typical: <strong>100–500 tokens per tool</strong>. A server with 30 tools = 3K–15K.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Past messages</h3>
+        <p>The whole conversation history rides along on every turn — your prompts, the model&rsquo;s replies, every tool call and tool result. Grows monotonically.</p>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top:1rem;">Add file reads, RAG retrievals, and screenshots-as-text and a &ldquo;simple&rdquo; agent session can sit at 80K input tokens by turn five.</p>
+  </section>
+
+  <!-- 14. Compounding effect -->
+  <section class="slide">
+    <h2>The compounding effect</h2>
+    <p>Each turn re-bills <em>all</em> prior context. A modest baseline grows fast.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Turn</th>
+          <th class="num">System + skills + MCP</th>
+          <th class="num">History so far</th>
+          <th class="num">Input billed</th>
+          <th class="num">Cumulative input cost <span class="muted small">(no cache)</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td class="num">15,000</td><td class="num">0</td><td class="num">15,000</td><td class="num">$0.045</td></tr>
+        <tr><td>3</td><td class="num">15,000</td><td class="num">4,000</td><td class="num">19,000</td><td class="num">$0.159</td></tr>
+        <tr><td>5</td><td class="num">15,000</td><td class="num">12,000</td><td class="num">27,000</td><td class="num">$0.363</td></tr>
+        <tr><td>10</td><td class="num">15,000</td><td class="num">35,000</td><td class="num">50,000</td><td class="num">$1.401</td></tr>
+        <tr><td>20</td><td class="num">15,000</td><td class="num">95,000</td><td class="num">110,000</td><td class="num">$5.700</td></tr>
+      </tbody>
+    </table>
+    <p class="muted small" style="margin-top:0.8rem;">Sonnet 4.6 input rate, no caching. Output cost not included. The exponential-looking growth is the input being re-sent.</p>
+  </section>
+
+  <!-- 15. Mitigation -->
+  <section class="slide">
+    <h2>How to keep the bill flat</h2>
+    <div class="grid-2">
+      <div class="card good">
+        <h3 style="margin-top:0;">Cache the stable prefix</h3>
+        <p>System prompt + skills + MCP schemas + loaded docs rarely change within a session. Mark them as a cache breakpoint. The 90% read discount neutralises most context bloat.</p>
+      </div>
+      <div class="card good">
+        <h3 style="margin-top:0;">Trim what you load</h3>
+        <p>Only enable the skills and MCP servers you actually need for the task. Most agents never call 80% of the tools they advertise.</p>
+      </div>
+      <div class="card good">
+        <h3 style="margin-top:0;">Compact history</h3>
+        <p>Summarise older turns instead of carrying them verbatim. Many CLIs do this automatically near the context limit.</p>
+      </div>
+      <div class="card good">
+        <h3 style="margin-top:0;">Right-size the model</h3>
+        <p>Cheap models for routing/extraction, expensive ones for reasoning. Haiku-class models can be 5–20× cheaper than Opus-class for the same input.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16. /context -->
+  <section class="slide">
+    <h2>Monitoring with <code>/context</code> <span class="badge">CLI only — for now</span></h2>
+    <div class="grid-2">
+      <div>
+        <p>The Claude Code CLI has a <code>/context</code> command that breaks down the current session&rsquo;s input usage by category.</p>
+        <p>It tells you exactly which slice of context is costing you tokens — before you click send on the next turn.</p>
+        <h3>Use it to answer:</h3>
+        <ul>
+          <li>Which MCP server is the heaviest?</li>
+          <li>Are my skills bigger than my actual conversation?</li>
+          <li>Am I close to the model&rsquo;s context window?</li>
+          <li>Is it time to compact?</li>
+        </ul>
+      </div>
+      <div>
+        <pre>&gt; /context
+
+System prompt          1,842
+CLAUDE.md              2,310
+Skills (12 loaded)    14,580
+MCP tools (3 servers)  9,224
+Messages              22,118
+Tool results           7,003
+─────────────────────────────
+Used                  57,077  /  200,000  (29%)
+Free                 142,923</pre>
+        <p class="muted small" style="margin-top:0.6rem;">Output is illustrative — exact format varies by Claude Code version.</p>
+      </div>
+    </div>
+    <div class="card warn" style="margin-top:1rem;">
+      <p style="margin:0;"><strong>Heads up:</strong> <code>/context</code> is currently a CLI-only feature. The web app, IDE extensions, and direct API calls don&rsquo;t expose it — you&rsquo;ll need to instrument those yourself via the usage fields in the API response.</p>
+    </div>
+  </section>
+
+  <!-- 17. Takeaways -->
+  <section class="slide">
+    <h2>Takeaways</h2>
+    <ul>
+      <li><strong>Tokens are the unit of billing</strong> — and of every context-window limit. Estimate them or be surprised by them.</li>
+      <li><strong>Output is ~5× input.</strong> Verbose models writing long answers cost more than they look.</li>
+      <li><strong>Long context compounds.</strong> Every turn re-bills the entire prompt. A 50K-token document at turn 100 has been billed 100 times.</li>
+      <li><strong>Caching is the single biggest lever.</strong> 90% off the input rate for stable prefixes. Often turns a $30 session into a $5 one.</li>
+      <li><strong>Watch the bloat sources:</strong> skills, MCP servers, and accumulating history are the usual suspects. Load only what you use.</li>
+      <li><strong>Use <code>/context</code></strong> in Claude Code to see where your tokens are actually going — guesswork is expensive.</li>
+    </ul>
+    <p class="center muted" style="margin-top:2rem;">Questions?</p>
+  </section>
+
+</div>
+
+<div class="progress" id="progress"></div>
+<div class="footer"><span id="pageNum">1</span> / <span id="pageTotal">17</span></div>
+<div class="nav-hint">← / → arrows · space · home / end</div>
+
+<script>
+  (function () {
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const progress = document.getElementById('progress');
+    const pageNum = document.getElementById('pageNum');
+    const pageTotal = document.getElementById('pageTotal');
+    pageTotal.textContent = slides.length;
+
+    let i = 0;
+    const hash = parseInt(location.hash.replace('#', ''), 10);
+    if (!Number.isNaN(hash) && hash >= 1 && hash <= slides.length) i = hash - 1;
+
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+      progress.style.width = ((i + 1) / slides.length * 100) + '%';
+      pageNum.textContent = i + 1;
+      history.replaceState(null, '', '#' + (i + 1));
+    }
+
+    function next() { show(i + 1); }
+    function prev() { show(i - 1); }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+      else if (e.key === 'Home') { e.preventDefault(); show(0); }
+      else if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+    });
+
+    // click left/right halves
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('a, button, pre, code, td, th')) return;
+      const x = e.clientX / window.innerWidth;
+      if (x > 0.5) next(); else prev();
+    });
+
+    // touch swipe
+    let tx = null;
+    document.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if (tx === null) return;
+      const dx = e.changedTouches[0].clientX - tx;
+      if (Math.abs(dx) > 50) (dx < 0 ? next : prev)();
+      tx = null;
+    });
+
+    show(i);
+  })();
+</script>
+
+</body>
+</html>
