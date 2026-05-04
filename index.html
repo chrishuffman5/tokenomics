@@ -222,6 +222,70 @@
   .bar .fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
   .bar .val { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.95rem; }
 
+  /* Block-in-block context window visualization */
+  .window-vis {
+    display: flex;
+    width: 100%;
+    height: 260px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 0.6rem;
+    background: var(--bg-2);
+  }
+  .window-vis .block {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(0,0,0,0.25);
+    padding: 0.4rem 0.5rem;
+    font-size: 0.78rem;
+    position: relative;
+    overflow: hidden;
+    min-width: 14px;
+  }
+  .window-vis .block:last-child { border-right: none; }
+  .window-vis .block-label { font-weight: 700; color: var(--fg); white-space: nowrap; }
+  .window-vis .block-meta { color: var(--muted); font-size: 0.7rem; }
+  .window-vis .sub { display: flex; flex-direction: column; flex: 1; gap: 4px; margin-top: 0.35rem; min-height: 0; }
+  .window-vis .sub .row {
+    padding: 0.25rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    overflow: hidden;
+  }
+  .window-vis .row.used { background: rgba(74, 222, 128, 0.32); color: var(--good); }
+  .window-vis .row.dead { background: rgba(248, 113, 113, 0.30); color: var(--bad); }
+  .window-vis .b-system { background: rgba(76, 201, 240, 0.15); }
+  .window-vis .b-claude { background: rgba(76, 201, 240, 0.22); }
+  .window-vis .b-skills { background: rgba(247, 184, 1, 0.13); }
+  .window-vis .b-mcp { background: rgba(247, 184, 1, 0.20); }
+  .window-vis .b-history { background: rgba(167, 139, 250, 0.18); }
+  .window-vis .b-tools { background: rgba(167, 139, 250, 0.12); }
+  .window-vis .b-current { background: rgba(74, 222, 128, 0.40); }
+  .window-vis .b-free { background: transparent; color: var(--muted); }
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem 1rem;
+    margin-top: 0.9rem;
+    font-size: 0.88rem;
+  }
+  .legend .item { display: flex; align-items: center; gap: 0.5rem; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--border); }
+
+  .ruler {
+    display: flex;
+    width: 100%;
+    margin-top: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ruler .tick { flex: 1; text-align: right; padding-right: 4px; border-right: 1px dashed var(--border); }
+  .ruler .tick:first-child { text-align: left; padding-left: 4px; padding-right: 0; }
+
   @media print {
     body { overflow: visible; background: white; color: black; }
     .deck { height: auto; }
@@ -624,7 +688,289 @@ Free                 142,923</pre>
     </div>
   </section>
 
-  <!-- 17. Takeaways -->
+  <!-- 17. Anatomy of a bloated context window -->
+  <section class="slide">
+    <h2>Anatomy of a bloated 200K context window</h2>
+    <p class="muted">Each block&rsquo;s width is proportional to its share of the window. <span style="color:var(--good);">Green</span> = actually used this turn. <span style="color:var(--bad);">Red</span> = dead weight you&rsquo;re paying for anyway.</p>
+
+    <div class="window-vis">
+      <div class="block b-system" style="flex-grow: 1.8;" title="System prompt — 1,800 tokens">
+        <div class="block-label">Sys</div>
+        <div class="block-meta">1.8K</div>
+      </div>
+      <div class="block b-claude" style="flex-grow: 3.2;" title="CLAUDE.md — 3,200 tokens">
+        <div class="block-label">CLAUDE</div>
+        <div class="block-meta">3.2K</div>
+      </div>
+      <div class="block b-skills" style="flex-grow: 32;" title="Skills — 32,000 tokens">
+        <div class="block-label">Skills (28 loaded)</div>
+        <div class="block-meta">32K · 16%</div>
+        <div class="sub">
+          <div class="row used" style="flex-grow: 6;">used: 6K (3 skills)</div>
+          <div class="row dead" style="flex-grow: 26;">dead weight: 26K (25 skills)</div>
+        </div>
+      </div>
+      <div class="block b-mcp" style="flex-grow: 25;" title="MCP tools — 25,000 tokens">
+        <div class="block-label">MCP (5 servers · 80 tools)</div>
+        <div class="block-meta">25K · 12.5%</div>
+        <div class="sub">
+          <div class="row used" style="flex-grow: 2;">used: 2K (1 tool)</div>
+          <div class="row dead" style="flex-grow: 23;">dead weight: 23K (79 tools)</div>
+        </div>
+      </div>
+      <div class="block b-history" style="flex-grow: 60;" title="Conversation history — 60,000 tokens">
+        <div class="block-label">History (40 turns)</div>
+        <div class="block-meta">60K · 30%</div>
+        <div class="sub">
+          <div class="row used" style="flex-grow: 8;">relevant: 8K (last 3 turns)</div>
+          <div class="row dead" style="flex-grow: 52;">noise: 52K (older turns)</div>
+        </div>
+      </div>
+      <div class="block b-tools" style="flex-grow: 20;" title="Tool results carried forward — 20,000 tokens">
+        <div class="block-label">Tool results</div>
+        <div class="block-meta">20K · 10%</div>
+        <div class="sub">
+          <div class="row dead" style="flex-grow: 1;">stale file reads &amp; web fetches</div>
+        </div>
+      </div>
+      <div class="block b-current" style="flex-grow: 0.5;" title="Current user message — 500 tokens"></div>
+      <div class="block b-free" style="flex-grow: 57.5;" title="Free space — 57,500 tokens">
+        <div class="block-label">Free</div>
+        <div class="block-meta">57.5K · 28.75%</div>
+      </div>
+    </div>
+
+    <div class="ruler">
+      <span class="tick">0K</span><span class="tick">50K</span><span class="tick">100K</span><span class="tick">150K</span><span class="tick">200K</span>
+    </div>
+
+    <div class="legend">
+      <div class="item"><span class="swatch" style="background: rgba(76,201,240,0.22);"></span> System &amp; CLAUDE.md — 5K</div>
+      <div class="item"><span class="swatch" style="background: rgba(247,184,1,0.13);"></span> Skills &amp; MCP — 57K</div>
+      <div class="item"><span class="swatch" style="background: rgba(167,139,250,0.18);"></span> History &amp; tool results — 80K</div>
+      <div class="item"><span class="swatch" style="background: rgba(74,222,128,0.40);"></span> Current user message — 0.5K</div>
+    </div>
+
+    <div class="card bad" style="margin-top:1rem;">
+      <p style="margin:0;"><strong>Used: 142.5K (71%) · Dead weight inside that: ~101K (71% of used).</strong> Of every input dollar this turn, ~71¢ buys context the model isn&rsquo;t using.</p>
+    </div>
+  </section>
+
+  <!-- 18. Lean vs bloated agent -->
+  <section class="slide">
+    <h2>Example 4 — Lean vs bloated, same task</h2>
+    <p class="muted">Task: &ldquo;Summarize this 5K-token document.&rdquo; 20-turn session. Sonnet 4.6, no caching.</p>
+    <div class="compare" style="margin-top:0.8rem;">
+      <div class="card good">
+        <h3 style="margin-top:0;">🟢 Lean agent</h3>
+        <ul>
+          <li>System: 1.8K</li>
+          <li>2 skills (only what&rsquo;s needed): 2K</li>
+          <li>1 MCP server, 4 tools: 1.5K</li>
+          <li>Document: 5K</li>
+          <li>User message: 0.2K</li>
+        </ul>
+        <p><strong>Per-turn input: 10.5K</strong></p>
+        <p>20 turns × 10.5K × $3/1M = </p>
+        <div class="total" style="color: var(--good);">$0.63</div>
+      </div>
+      <div class="card bad">
+        <h3 style="margin-top:0;">🔴 Bloated agent</h3>
+        <ul>
+          <li>System: 1.8K</li>
+          <li>28 skills (kitchen sink): 32K</li>
+          <li>5 MCP servers, 80 tools: 25K</li>
+          <li>Document: 5K</li>
+          <li>User message: 0.2K</li>
+        </ul>
+        <p><strong>Per-turn input: 64K</strong></p>
+        <p>20 turns × 64K × $3/1M = </p>
+        <div class="total" style="color: var(--bad);">$3.84</div>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top:0.8rem;">Same answers. <strong>6× the bill.</strong> History costs would compound on top of these baselines.</p>
+  </section>
+
+  <!-- 19. Unused-skills tax -->
+  <section class="slide">
+    <h2>Example 5 — The unused-skills tax</h2>
+    <p>You loaded <strong>28 skills</strong>. Over a 20-turn session you actually invoked <strong>3</strong>. The other 25 rode along on every turn — paid for, never used.</p>
+    <pre>Dead-weight skills :  25 skills × ~1,040 tokens avg  = 26,000 tokens
+Per turn (no cache):  26,000 × $3 / 1M                = $0.078
+20-turn session    :  20 × $0.078                     = <strong>$1.56 of pure waste</strong>
+
+With caching       :  26,000 × $0.30 / 1M             = $0.0078
+20-turn session    :  $0.1875 cache write + 19×$0.0078 = <strong>$0.34</strong>
+                                                          (cache cuts the waste 78%)</pre>
+    <div class="card warn" style="margin-top:0.8rem;">
+      <p style="margin:0;">Caching softens the blow but doesn&rsquo;t make bloat free. You&rsquo;re still paying to <em>store</em> tokens the model never uses, and you&rsquo;re consuming context-window budget you could spend on the actual task.</p>
+    </div>
+  </section>
+
+  <!-- 20. MCP server overload -->
+  <section class="slide">
+    <h2>Example 6 — MCP server overload</h2>
+    <p>Three MCP servers. Each advertises its full tool catalog in the system prompt as JSON schema.</p>
+    <table>
+      <thead><tr><th>Server</th><th class="num">Tools</th><th class="num">Schema tokens</th><th class="num">Tools you used</th><th class="num">Wasted tokens</th></tr></thead>
+      <tbody>
+        <tr><td>filesystem-mcp</td><td class="num">12</td><td class="num">3,200</td><td class="num">2</td><td class="num">~2,700</td></tr>
+        <tr><td>jira-mcp</td><td class="num">28</td><td class="num">9,800</td><td class="num">0</td><td class="num">9,800</td></tr>
+        <tr><td>monitoring-mcp</td><td class="num">40</td><td class="num">12,000</td><td class="num">1</td><td class="num">~11,700</td></tr>
+        <tr><th>Total</th><th class="num">80</th><th class="num">25,000</th><th class="num">3</th><th class="num">~24,200</th></tr>
+      </tbody>
+    </table>
+    <p class="formula" style="margin-top:0.8rem;">
+      24,200 dead tokens × 30 turns × $3/1M = <strong>$2.18 / session</strong> wasted on schemas the model never invoked.
+    </p>
+    <p class="muted small">Worst offender: <code>jira-mcp</code> — never called once but still added 9.8K of input every turn for 30 turns. <strong>Disable servers per task</strong>, don&rsquo;t enable everything globally.</p>
+  </section>
+
+  <!-- 21. History hoarding -->
+  <section class="slide">
+    <h2>Example 7 — Conversation history hoarding</h2>
+    <p>40-turn debugging session. The user&rsquo;s current question only depends on the last 3 turns.</p>
+    <div class="grid-2" style="margin-top:0.5rem;">
+      <div class="card bad">
+        <h3 style="margin-top:0;">No compaction</h3>
+        <p>Full history carried verbatim: <strong>60K tokens</strong> ride along on turn 41.</p>
+        <p>Cost (no cache): 60K × $3/1M = <strong>$0.18</strong> just for history, on a single turn.</p>
+        <p>Cost across remaining 10 turns: <strong>$1.80+</strong>.</p>
+      </div>
+      <div class="card good">
+        <h3 style="margin-top:0;">Compacted</h3>
+        <p>Older 37 turns summarised to 4K bullet points; last 3 turns kept verbatim (4K).</p>
+        <p>History size: <strong>8K tokens</strong>.</p>
+        <p>Cost (no cache): 8K × $3/1M = <strong>$0.024</strong> per turn → <strong>$0.24</strong> across 10 turns.</p>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top:0.8rem;">Compaction trades a small quality risk (lost detail in older turns) for a 7× reduction in carrying cost — and it frees window space for new work.</p>
+  </section>
+
+  <!-- 22. Tool result residue -->
+  <section class="slide">
+    <h2>Example 8 — Tool-result residue</h2>
+    <p>Three operations early in the session leave large outputs in the transcript:</p>
+    <table>
+      <thead><tr><th>Action (turn)</th><th class="num">Output tokens</th><th class="num">Still relevant?</th></tr></thead>
+      <tbody>
+        <tr><td>Read 2,500-line config file (turn 2)</td><td class="num">9,400</td><td class="num">No — only one value used</td></tr>
+        <tr><td>Web fetch — pricing page HTML (turn 5)</td><td class="num">7,200</td><td class="num">No — extracted one number</td></tr>
+        <tr><td>Grep results across repo (turn 8)</td><td class="num">3,400</td><td class="num">Partially</td></tr>
+      </tbody>
+    </table>
+    <pre>Carried in every subsequent turn : 20,000 tokens
+Turns 9 through 25 (17 turns)    : 17 × 20,000 × $3/1M = <strong>$1.02</strong>
+
+Better: extract the one value you needed, then drop the raw blob.
+After cleanup, those three tool results compress to ~600 tokens.
+17 × 600 × $3/1M                 = <strong>$0.031</strong>  (33× cheaper)</pre>
+  </section>
+
+  <!-- 23. Cache write tax on bloat -->
+  <section class="slide">
+    <h2>Example 9 — The cache-write tax on bloat</h2>
+    <p>Caching is the obvious answer to bloat — but caching <em>junk</em> isn&rsquo;t free.</p>
+    <pre>You cache a 60K stable prefix containing:
+   - 10K actually-needed system &amp; skills      ← worth caching
+   - 50K dead-weight skills + MCP schemas     ← waste
+
+Cache write (Sonnet 4.6, 5-min TTL):
+  60K × $3.75 / 1M = <strong>$0.225</strong>   ← what you paid
+  10K × $3.75 / 1M = $0.0375    ← what you should have paid
+                              ─────────────────
+                              $0.1875 wasted on the cache write alone
+</pre>
+    <p>Then on every cache miss (TTL expires, prefix changes), you pay that <strong>$0.1875 tax again</strong>. In a long, bursty session that&rsquo;s easily 5–10 cache writes — $1+ wasted before any model output.</p>
+    <p class="muted small">Lesson: trim <em>before</em> you cache. Caching a leaner prefix beats caching a fat one.</p>
+  </section>
+
+  <!-- 24. Cache invalidation cascade -->
+  <section class="slide">
+    <h2>Example 10 — Cache invalidation cascade</h2>
+    <p>The cache is <strong>prefix-aligned</strong>. Match has to be exact, byte-for-byte, up to the cache breakpoint. Change one token in the middle → everything after that point is uncached.</p>
+    <div class="grid-2" style="margin-top:0.5rem;">
+      <div class="card warn">
+        <h3 style="margin-top:0;">Stable prefix order</h3>
+        <pre style="font-size:0.85rem;">[ system        ]  ← stable
+[ CLAUDE.md     ]  ← stable
+[ skills        ]  ← <strong>occasionally edited</strong>
+[ MCP schemas   ]  ← stable
+[ history       ]  ← grows each turn
+&lt;cache breakpoint&gt;</pre>
+        <p>Toggle one skill → re-pay cache write for skills + MCP + history. ~50K re-cached.</p>
+      </div>
+      <div class="card good">
+        <h3 style="margin-top:0;">Reordered</h3>
+        <pre style="font-size:0.85rem;">[ system        ]  ← stable
+[ CLAUDE.md     ]  ← stable
+[ MCP schemas   ]  ← stable
+&lt;cache breakpoint&gt;
+[ skills        ]  ← may change
+[ history       ]  ← grows</pre>
+        <p>Toggling a skill busts only the post-breakpoint slice. Save the cache for what&rsquo;s truly stable.</p>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top:0.8rem;">Cost of getting this wrong: 50K × $3.75/1M = <strong>$0.19 per invalidation</strong>. Multiply by every time someone toggles a skill mid-session.</p>
+  </section>
+
+  <!-- 25. Bloat hurts quality too -->
+  <section class="slide">
+    <h2>Example 11 — Bloat hurts quality, not just cost</h2>
+    <div class="grid-2">
+      <div>
+        <h3 style="margin-top:0;">Lost in the middle</h3>
+        <p>Long-context studies repeatedly show models perform worst on information placed in the middle of a stuffed window. Bury the actual user request behind 50K of unused tool schemas and the model may genuinely miss it.</p>
+        <h3>Slower time-to-first-token</h3>
+        <p>Prefill scales with input length. A 10K prompt streams its first token in ~0.5s; a 150K prompt can take 5–15s before any output. Caching helps, but a cache miss on a fat prefix produces a long, awkward pause.</p>
+      </div>
+      <div class="card bad">
+        <h3 style="margin-top:0;">The double penalty</h3>
+        <p>Bloated context costs you:</p>
+        <ul>
+          <li><strong>Money</strong> — every turn pays for unused tokens</li>
+          <li><strong>Latency</strong> — longer prefill, slower TTFT</li>
+          <li><strong>Quality</strong> — model attention dilutes; instructions get buried</li>
+          <li><strong>Headroom</strong> — less window left for actual work</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 26. Minimum-viable-context -->
+  <section class="slide">
+    <h2>Example 12 — What good looks like</h2>
+    <p class="muted">A minimum-viable-context discipline. Before each session, ask:</p>
+    <div class="grid-2" style="margin-top:0.5rem;">
+      <div class="card good">
+        <h3 style="margin-top:0;">✅ Do</h3>
+        <ul>
+          <li>Enable only the skills you need <em>for this task</em></li>
+          <li>Scope MCP servers per project, not globally</li>
+          <li>Drop large tool outputs after extracting what you need</li>
+          <li>Compact history once it stops being useful</li>
+          <li>Put stable content <em>before</em> the cache breakpoint</li>
+          <li>Run <code>/context</code> early; trim if &gt;30% used before the first turn</li>
+        </ul>
+      </div>
+      <div class="card bad">
+        <h3 style="margin-top:0;">❌ Avoid</h3>
+        <ul>
+          <li>&ldquo;Just enable everything in case I need it&rdquo;</li>
+          <li>Loading every MCP server on every project</li>
+          <li>Reading whole large files when grep would do</li>
+          <li>Pasting raw API responses when one field is what you wanted</li>
+          <li>Caching a fat prefix and calling it solved</li>
+          <li>Ignoring <code>/context</code> until you hit the limit</li>
+        </ul>
+      </div>
+    </div>
+    <p class="formula" style="margin-top:1rem;">
+      Lean baseline + caching + compaction = the bloated session&rsquo;s cost <strong>cut by 80–95%</strong> with <em>better</em> model output.
+    </p>
+  </section>
+
+  <!-- 27. Takeaways -->
   <section class="slide">
     <h2>Takeaways</h2>
     <ul>
@@ -641,7 +987,7 @@ Free                 142,923</pre>
 </div>
 
 <div class="progress" id="progress"></div>
-<div class="footer"><span id="pageNum">1</span> / <span id="pageTotal">17</span></div>
+<div class="footer"><span id="pageNum">1</span> / <span id="pageTotal">27</span></div>
 <div class="nav-hint">← / → arrows · space · home / end</div>
 
 <script>
